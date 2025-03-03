@@ -1,163 +1,154 @@
 import streamlit as st
 import time
-import random
  
 # ============== 游戏配置 ==============
-GAME_TIME = 45           # 总游戏时间
-COMBO_BONUS = 5         # 连击加成
-SPECIAL_HEART_INTERVAL = 8  # 特殊爱心出现间隔
-PENALTY_PROB = 0.15     # 危险爱心出现概率
-POWER_UP_TYPES = ["🕒 时间冻结", "💘 双倍心动", "🛡️ 爱心护盾"]
+CHAPTERS = [
+    {
+        "title": "初遇咖啡馆",
+        "scenes": [
+            {
+                "text": "周六下午的咖啡馆，你注意到邻座正在看《小王子》的她，你会：",
+                "choices": [
+                    {"text": "借书搭讪：「我也喜欢这句星星发亮是为了让每个人有一天都能找到自己的星星」", "score": 3},
+                    {"text": "偷偷画下她的侧影夹在书里", "score": 2},
+                    {"text": "请店员送她一杯卡布奇诺", "score": 1}
+                ]
+            },
+            {
+                "text": "她注意到你的举动，微笑着询问缘由，你回应：",
+                "choices": [
+                    {"text": "「你的眼睛比小王子的玫瑰更动人」", "emotion": 5},
+                    {"text": "「这本书记录了我的童年幻想」", "emotion": 3},
+                    {"text": "「要一起拼个桌吗？」", "emotion": 2}
+                ]
+            }
+        ]
+    },
+    {
+        "title": "雨夜重逢",
+        "scenes": [
+            {
+                "text": "三个月后的雨夜，地铁站偶遇没带伞的她，你会：",
+                "choices": [
+                    {"text": "把伞塞给她转身跑进雨中", "memory": "雨中背影"},
+                    {"text": "提议共享一把伞步行送她", "memory": "伞下心跳"},
+                    {"text": "打车送她并悄悄付了车费", "memory": "车窗雾气"}
+                ]
+            }
+        ]
+    }
+]
  
-# ============== 游戏状态初始化 ==============
-if "stage" not in st.session_state:
+# ============== 游戏状态管理 ==============
+if "chapter" not in st.session_state:
     st.session_state.update({
-        "score": 0,
-        "combo": 0,
-        "game_active": False,
-        "start_time": 0,
-        "power_ups": {key: 0 for key in POWER_UP_TYPES},
-        "shield_active": False,
-        "time_frozen": False,
-        "last_special": 0
+        "chapter_index": 0,
+        "scene_index": 0,
+        "memories": [],
+        "emotion_score": 0,
+        "last_choice": None
     })
  
 # ============== 游戏样式 ==============
-st.markdown(f"""
+st.markdown("""
 <style>
-/* 动态渐变背景 */
-@keyframes gradientBG {{
-    0% {{ background-position: 0% 50%; }}
-    50% {{ background-position: 100% 50%; }}
-    100% {{ background-position: 0% 50%; }}
-}}
-.game-container {{
-    background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
-    background-size: 400% 400%;
-    animation: gradientBG 15s ease infinite;
-    padding: 2rem;
-    border-radius: 20px;
-}}
-/* 爱心动画 */
-@keyframes heartPulse {{
-    0% {{ transform: scale(0.9); opacity: 0.7; }}
-    100% {{ transform: scale(1.2); opacity: 1; }}
-}}
-.heart-btn {{
-    animation: heartPulse 0.8s ease-in-out infinite alternate;
+/* 章节标题动画 */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.chapter-title {
+    animation: fadeInUp 1s ease;
+    color: #ff69b4;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    border-left: 5px solid #ff1493;
+    padding-left: 20px;
+}
+/* 选择按钮特效 */
+.stButton > button {
     transition: all 0.3s !important;
-}}
-.danger {{
-    animation: heartPulse 0.4s ease-in-out infinite alternate !important;
-    background: rgba(255,0,0,0.2) !important;
-}}
+    border: 2px solid #ffb6c1 !important;
+}
+.stButton > button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(255,105,180,0.3);
+}
+/* 记忆卡片 */
+.memory-card {
+    background: rgba(255,255,255,0.9);
+    border-radius: 10px;
+    padding: 15px;
+    margin: 10px 0;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+}
 </style>
 """, unsafe_allow_html=True)
  
 # ============== 游戏逻辑 ==============
-def handle_click(heart_type):
-    """处理爱心点击"""
-    if st.session_state.shield_active and heart_type == "💔":
-        return
+def make_choice(choice_data):
+    """处理玩家选择"""
+    # 记录情感分数
+    if "emotion" in choice_data:
+        st.session_state.emotion_score += choice_data["emotion"]
+    # 收集记忆碎片
+    if "memory" in choice_data:
+        st.session_state.memories.append(choice_data["memory"])
+    # 推进剧情
+    if st.session_state.scene_index < len(CHAPTERS[st.session_state.chapter_index]["scenes"]) - 1:
+        st.session_state.scene_index += 1
+    else:
+        if st.session_state.chapter_index < len(CHAPTERS) - 1:
+            st.session_state.chapter_index += 1
+            st.session_state.scene_index = 0
+        else:
+            st.session_state.chapter_index = -1  # 标记游戏结束
+ 
+# ============== 游戏渲染 ==============
+# 侧边栏显示记忆碎片
+with st.sidebar:
+    st.header("💌 记忆收藏馆")
+    if st.session_state.memories:
+        for memo in set(st.session_state.memories):
+            st.markdown(f'<div class="memory-card">📜 {memo}</div>', unsafe_allow_html=True)
+    else:
+        st.write("暂时还没有收集到记忆碎片...")
+ 
+# 主游戏界面
+if st.session_state.chapter_index == -1:
+    st.balloons()
+    st.markdown(f"""
+    <div style="text-align:center; padding:50px;">
+        <h1>🎉 故事仍在继续...</h1>
+        <h3>情感温度计：{st.session_state.emotion_score}°</h3>
+        <p>你们共同创造了 {len(set(st.session_state.memories))} 个独特回忆</p>
+        <button onclick="window.location.reload()" style="
+            background: #ff69b4;
+            color: white;
+            border: none;
+            padding: 10px 30px;
+            border-radius: 25px;
+            margin-top: 20px;
+        ">重新开始</button>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    current_chapter = CHAPTERS[st.session_state.chapter_index]
+    current_scene = current_chapter["scenes"][st.session_state.scene_index]
     
-    if heart_type == "❤️":
-        base = 2
-        st.session_state.combo += 1
-    elif heart_type == "💛":
-        base = 3
-        st.session_state.combo += 2
-    elif heart_type == "💔":
-        st.session_state.score = max(0, st.session_state.score - 15)
-        st.session_state.combo = 0
-        return
-    elif heart_type == "💖":
-        base = 5
-        st.session_state.combo += 3
+    # 章节标题
+    st.markdown(f'<h1 class="chapter-title">{current_chapter["title"]}</h1>', unsafe_allow_html=True)
     
-    # 连击加成
-    combo_bonus = (st.session_state.combo // 5) * COMBO_BONUS
-    st.session_state.score += base + combo_bonus
- 
-    # 随机获得道具
-    if random.random() < 0.2:
-        power = random.choice(POWER_UP_TYPES)
-        st.session_state.power_ups[power] += 1
- 
-def use_power_up(power_type):
-    """使用道具"""
-    if st.session_state.power_ups[power_type] > 0:
-        st.session_state.power_ups[power_type] -= 1
-        if power_type == "🕒 时间冻结":
-            st.session_state.time_frozen = True
-        elif power_type == "💘 双倍心动":
-            st.session_state.score += st.session_state.combo * 2
-        elif power_type == "🛡️ 爱心护盾":
-            st.session_state.shield_active = True
- 
-# ============== 界面渲染 ==============
-with st.container():
-    st.markdown('<div class="game-container">', unsafe_allow_html=True)
+    # 情景描述
+    st.markdown(f'<div style="font-size:18px; margin:30px 0;">{current_scene["text"]}</div>', unsafe_allow_html=True)
     
-    # 游戏控制区
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.markdown("### 🎮 操作面板")
-        if not st.session_state.game_active:
-            if st.button("✨ 开始双人挑战", use_container_width=True):
-                st.session_state.game_active = True
-                st.session_state.start_time = time.time()
-        
-        # 道具使用区
-        st.markdown("### 🎒 道具背包")
-        for power in POWER_UP_TYPES:
-            if st.button(f"{power} x{st.session_state.power_ups[power]}", 
-                        help="点击使用", 
-                        key=f"power_{power}",
-                        on_click=use_power_up,
-                        args=(power,)):
-                pass
- 
-    # 游戏主界面
-    with col2:
-        if st.session_state.game_active:
-            elapsed = time.time() - st.session_state.start_time
-            time_left = max(0, GAME_TIME - int(elapsed))
-            
-            # 游戏结束检测
-            if time_left <= 0 and not st.session_state.time_frozen:
-                st.session_state.game_active = False
-                st.balloons()
-                st.session_state.time_frozen = False
-                st.session_state.shield_active = False
-            
-            # 实时状态显示
-            st.markdown(f"""
-            <div style="background:rgba(255,255,255,0.9); padding:15px; border-radius:10px;">
-                <h4>⏳ 剩余时间: {time_left}s</h4>
-                <h4>✨ 当前得分: {st.session_state.score}</h4>
-                <h4>⚡ 连击加成: x{(st.session_state.combo // 5) + 1}</h4>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # 动态生成爱心矩阵
-            cols = st.columns(4)
-            for idx, col in enumerate(cols):
-                with col:
-                    heart_type = "❤️"
-                    # 特殊爱心逻辑
-                    if time.time() - st.session_state.last_special > SPECIAL_HEART_INTERVAL:
-                        heart_type = random.choice(["💖", "💛"])
-                        st.session_state.last_special = time.time()
-                    elif random.random() < PENALTY_PROB:
-                        heart_type = "💔"
-                    
-                    st.button(heart_type, 
-                            key=f"heart_{idx}_{time.time()}",
-                            on_click=handle_click,
-                            args=(heart_type,),
-                            kwargs={},
-                            help="小心红色爱心！",
-                            use_container_width=True,
-                            )
- 
-    st.markdown('</div>', unsafe_allow_html=True)
+    # 选项按钮
+    cols = st.columns(len(current_scene["choices"]))
+    for idx, choice in enumerate(current_scene["choices"]):
+        with cols[idx]:
+            st.button(
+                choice["text"],
+                on_click=make_choice,
+                args=(choice,),
+                key=f"choice_{idx}",
+                help="点击做出你的选择" if "memory" in choice else None
+            )
