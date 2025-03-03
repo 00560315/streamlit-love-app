@@ -1,6 +1,14 @@
 import streamlit as st
 import os
-
+# 打印当前工作目录和文件列表
+st.write("当前工作目录:", os.getcwd())
+st.write("images文件夹是否存在:", os.path.exists("images"))
+st.write("图片文件是否存在:", os.path.exists("images/couple_bg.jpg"))
+import streamlit as st
+import base64
+import time
+from io import BytesIO
+from PIL import Image
 # ====================== 核心配置 ======================
 def set_photo_background():
     try:
