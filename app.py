@@ -1,82 +1,121 @@
 import streamlit as st
-import base64
-from io import BytesIO
 import time
-from PIL import Image
+import random
  
-# ====================== 核心代码 ======================
-def set_photo_background(image_path):
-    # 将图片转换为Base64
-    img = Image.open(image_path)
-    buffered = BytesIO()
-    img.save(buffered, format="PNG")
-    img_base64 = base64.b64encode(buffered.getvalue()).decode()
-    
-    # 设置全屏背景图
-    st.markdown(f"""
-    <style>
-    .stApp {{
-        background-image: url("data:image/png;base64,{img_base64}");
-        background-size: cover;
-        background-position: center;
-    }}
-    
-    /* 半透明遮罩层 */
-    .content-box {{
-        background: rgba(255, 255, 255, 0.9);
-        padding: 30px;
-        border-radius: 15px;
-        margin: 50px auto;
-        max-width: 80%;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-    }}
-    
-    /* 加大字体并添加行间距 */
-    .love-text {{
-        font-size: 20px !important;
-        line-height: 1.8;
-        color: #ff1493;
-        text-align: center;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
+# ============== 游戏配置 ==============
+GAME_TIME = 20  # 游戏时长(秒)
+HEART_EMOJI = "💖"  # 可替换为其他表情
+SCORE_FILE = "high_score.txt"  # 最高分记录文件
  
-# ====================== 主程序 ======================
-try:
-    set_photo_background("couple_bg.jpg")
-except:
-    st.error("请将背景图片命名为couple_bg.jpg并放在代码目录")
+# ============== 初始化游戏数据 ==============
+if "score" not in st.session_state:
+    st.session_state.score = 0
+if "game_active" not in st.session_state:
+    st.session_state.game_active = False
+if "start_time" not in st.session_state:
+    st.session_state.start_time = 0
  
-# 自定义情话（支持换行）
-quotes = [
-    """宝宝快看！我熬夜做的小程序真的跑起来啦！<br>
-    虽然它不会修图不会点外卖，<br>
-    但每次刷新都能看到你的照片在对我笑~<br>
-    第一个成功必须和你分享！"""
-]
+# ============== 游戏样式 ==============
+st.markdown(f"""
+<style>
+/* 爱心点击动画 */
+@keyframes heartBounce {{
+    0% {{ transform: scale(1); }}
+    50% {{ transform: scale(1.3); }}
+    100% {{ transform: scale(1); }}
+}}
+/* 游戏标题 */
+.title {{
+    color: #ff69b4;
+    text-shadow: 2px 2px 4px rgba(255,105,180,0.5);
+    text-align: center;
+}}
+/* 得分板 */
+.score {{
+    background: rgba(255,255,255,0.9);
+    border-radius: 10px;
+    padding: 15px;
+    margin: 20px auto;
+    width: 200px;
+    text-align: center;
+}}
+</style>
+""", unsafe_allow_html=True)
  
-with st.container():
-    st.markdown('<div class="content-box">', unsafe_allow_html=True)
+# ============== 游戏逻辑 ==============
+def update_score():
+    """点击爱心增加分数"""
+    st.session_state.score += random.randint(1,3)  # 随机加分
+ 
+def get_high_score():
+    """读取最高分"""
+    try:
+        with open(SCORE_FILE, "r") as f:
+            return int(f.read())
+    except:
+        return 0
+ 
+def save_high_score(score):
+    """保存最高分"""
+    with open(SCORE_FILE, "w") as f:
+        f.write(str(score))
+ 
+# ============== 界面渲染 ==============
+# 标题
+st.markdown('<h1 class="title">❤️ 爱心大作战 ❤️</h1>', unsafe_allow_html=True)
+ 
+# 游戏控制区
+col1, col2, col3 = st.columns(3)
+with col2:
+    if not st.session_state.game_active:
+        if st.button("🎮 开始游戏"):
+            st.session_state.game_active = True
+            st.session_state.score = 0
+            st.session_state.start_time = time.time()
+ 
+# 游戏主体
+if st.session_state.game_active:
+    # 倒计时计算
+    elapsed = time.time() - st.session_state.start_time
+    time_left = max(0, GAME_TIME - int(elapsed))
     
-    # 显示情话（带表情符号动画）
-    st.markdown(f"""
-    <div class="love-text">
-    🎉 {quotes[0]}
-    </div>
-    """, unsafe_allow_html=True)
+    # 结束检测
+    if time_left == 0:
+        st.session_state.game_active = False
+        high_score = get_high_score()
+        if st.session_state.score > high_score:
+            save_high_score(st.session_state.score)
+            st.balloons()
     
-    # 添加动态庆祝效果
-    if st.button("🎈 点击庆祝"):
-        st.balloons()
-        st.success("庆祝模式已激活！奖励系统加载中...")
-        time.sleep(1)
-        st.markdown("""
-        <div style="text-align:center; margin-top:20px;">
-            🎁 奖励清单：<br>
-            1. 奶茶续杯券x3<br>
-            2. 专属按摩服务x1小时<br>
-            3. 男朋友夸夸卡（无限次使用）
+    # 游戏界面
+    with st.container():
+        # 得分和倒计时
+        st.markdown(f"""
+        <div class="score">
+            <h3>剩余时间 ⏳: {time_left}s</h3>
+            <h3>当前得分 ✨: {st.session_state.score}</h3>
         </div>
         """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+        
+        # 生成爱心按钮
+        cols = st.columns(4)
+        for col in cols:
+            with col:
+                st.button(
+                    HEART_EMOJI,
+                    on_click=update_score,
+                    key=f"heart_{random.randint(0,1000)}",
+                    use_container_width=True,
+                    args=(),
+                    kwargs={},
+                )
+ 
+# 最高分显示
+if not st.session_state.game_active:
+    high_score = get_high_score()
+    st.markdown(f"""
+    <div class="score">
+        <h3>🏆 历史最高分: {high_score}</h3>
+        <h4>点击开始挑战吧！</h4>
+    </div>
+    """, unsafe_allow_html=True)
