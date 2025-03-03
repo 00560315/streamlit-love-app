@@ -166,3 +166,4 @@ else:
                 kwargs={"effect": choice["effect"]},
                 key=f"choice_{idx}_{st.session_state.game['last_rerun']}",
                 help="点击做出你的选择"
+            )
