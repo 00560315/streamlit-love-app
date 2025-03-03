@@ -1,79 +1,82 @@
 import streamlit as st
 import base64
-import os
 from io import BytesIO
+import time
 from PIL import Image
  
-# ====================== 核心配置 ======================
-def set_photo_background():
-    try:
-        img = Image.open("images/couple_bg.jpg")
-        buffered = BytesIO()
-        img.save(buffered, format="PNG")
-        img_base64 = base64.b64encode(buffered.getvalue()).decode()
-        
-        # 关键修复：添加内容容器层级保证可见性
-        st.markdown(f"""
-        <style>
-        .stApp {{
-            background-image: url("data:image/png;base64,{img_base64}");
-            background-size: cover;
-            position: relative;
-            z-index: 0;
-        }}
-        .content-layer {{
-            position: relative;
-            z-index: 1;
-        }}
-        </style>
-        """, unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"背景图加载失败: {str(e)}")
+# ====================== 核心代码 ======================
+def set_photo_background(image_path):
+    # 将图片转换为Base64
+    img = Image.open(image_path)
+    buffered = BytesIO()
+    img.save(buffered, format="PNG")
+    img_base64 = base64.b64encode(buffered.getvalue()).decode()
+    
+    # 设置全屏背景图
+    st.markdown(f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/png;base64,{img_base64}");
+        background-size: cover;
+        background-position: center;
+    }}
+    
+    /* 半透明遮罩层 */
+    .content-box {{
+        background: rgba(255, 255, 255, 0.9);
+        padding: 30px;
+        border-radius: 15px;
+        margin: 50px auto;
+        max-width: 80%;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }}
+    
+    /* 加大字体并添加行间距 */
+    .love-text {{
+        font-size: 20px !important;
+        line-height: 1.8;
+        color: #ff1493;
+        text-align: center;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
  
 # ====================== 主程序 ======================
-set_photo_background()
+try:
+    set_photo_background("couple_bg.jpg")
+except:
+    st.error("请将背景图片命名为couple_bg.jpg并放在代码目录")
  
-# 添加内容层容器（关键！）
+# 自定义情话（支持换行）
+quotes = [
+    """宝宝快看！我熬夜做的小程序真的跑起来啦！<br>
+    虽然它不会修图不会点外卖，<br>
+    但每次刷新都能看到你的照片在对我笑~<br>
+    第一个成功必须和你分享！"""
+]
+ 
 with st.container():
-    st.markdown('<div class="content-layer">', unsafe_allow_html=True)
+    st.markdown('<div class="content-box">', unsafe_allow_html=True)
     
-    # 半透明内容框
-    with st.container():
+    # 显示情话（带表情符号动画）
+    st.markdown(f"""
+    <div class="love-text">
+    🎉 {quotes[0]}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 添加动态庆祝效果
+    if st.button("🎈 点击庆祝"):
+        st.balloons()
+        st.success("庆祝模式已激活！奖励系统加载中...")
+        time.sleep(1)
         st.markdown("""
-        <div style="
-            background: rgba(255, 255, 255, 0.85);
-            padding: 30px;
-            border-radius: 15px;
-            margin: 50px auto;
-            max-width: 80%;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        ">
-        """, unsafe_allow_html=True)
-        
-        # 主标题
-        st.markdown("""
-        <h1 style="text-align:center; color:#ff1493;">
-            🎉 给最可爱的你
-        </h1>
-        """, unsafe_allow_html=True)
-        
-        # 正文内容
-        st.write("""
-        <div style="text-align:center; font-size:18px;">
-            这是我为你写的第一个小程序<br>
-            虽然简单，但每一行代码都在说<br>
-            「你是我最完美的算法」
+        <div style="text-align:center; margin-top:20px;">
+            🎁 奖励清单：<br>
+            1. 奶茶续杯券x3<br>
+            2. 专属按摩服务x1小时<br>
+            3. 男朋友夸夸卡（无限次使用）
         </div>
         """, unsafe_allow_html=True)
-        
-        # 互动按钮
-        if st.button("✨ 点击解锁奖励", use_container_width=True):
-            st.balloons()
-            st.success("""
-            **🎁 专属奖励已送达**
-            - 奶茶无限续杯券
-            - 男友按摩体验卡
-            - 24小时待机服务
-            """)
     
-    st.markdown('</div>', unsafe_allow_html=True)  # 关键闭合标签
+    st.markdown('</div>', unsafe_allow_html=True)
